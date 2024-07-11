@@ -67,7 +67,22 @@ export class AuthController {
         }
     }
 
+    static async refresh(req: IValidatedRequest<IValidatedRequestBody<IRefreshToken>>, res: any) {
+        try {
+            const userData = await TokenService.verifyRefreshToken(req.body.refreshToken);
+            if (!userData || !userData.id) return ErrorService.error(res, {}, StatusCodes.UNAUTHORIZED, ErrorEnum.invalidRefreshToken);
 
+            const refreshTokenFromDB = await TokenService.getRefreshTokenById(userData.id);
+            if (req.body.refreshToken !== refreshTokenFromDB) return ErrorService.error(res, {}, StatusCodes.UNAUTHORIZED, ErrorEnum.invalidRefreshToken);
+
+            const tokens = await TokenService.generateTokens(userData);
+
+            res.cookie('refreshToken', tokens.refreshToken, { maxAge: process.env.JWT_REFRESH_EXPIRE_IN_MILLISECONDS, httpOnly: true }); // if https? use: secure: true
+            res.send(tokens);
+        } catch (error) {
+            return ErrorService.error(res, error, error.status, error.message);
+        }
+    }
 
     static async logout(req: IValidatedRequest<IValidatedRequestBody<IRefreshToken>>, res: any) {
         try {
